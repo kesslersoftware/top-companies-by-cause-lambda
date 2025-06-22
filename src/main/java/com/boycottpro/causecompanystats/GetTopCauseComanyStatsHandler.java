@@ -2,19 +2,19 @@ package com.boycottpro.causecompanystats;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 
+import com.boycottpro.models.CauseCompanyStats;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
-import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
+import software.amazon.awssdk.services.dynamodb.model.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class GetTopCauseComanyStatsHandler implements RequestHandler<Map<String, Object>, APIGatewayProxyResponseEvent> {
+public class GetTopCauseComanyStatsHandler implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
     private static final String TABLE_NAME = "";
     private final DynamoDbClient dynamoDb;
@@ -29,15 +29,53 @@ public class GetTopCauseComanyStatsHandler implements RequestHandler<Map<String,
     }
 
     @Override
-    public APIGatewayProxyResponseEvent handleRequest(Map<String, Object> input, Context context) {
+    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
         try {
+            Map<String, String> pathParams = event.getPathParameters();
+            String causeId = (pathParams != null) ? pathParams.get("cause_id") : null;
+            if (causeId == null || causeId.isEmpty()) {
+                return new APIGatewayProxyResponseEvent()
+                        .withStatusCode(400)
+                        .withBody("{\"error\":\"Missing cause_id in path\"}");
+            }
+            List<CauseCompanyStats> stats = getTopCompaniesByCause(causeId);
+            String responseBody = objectMapper.writeValueAsString(stats);
             return new APIGatewayProxyResponseEvent()
                     .withStatusCode(200)
-                    .withBody("{\"success\"}");
+                    .withHeaders(Map.of("Content-Type", "application/json"))
+                    .withBody(responseBody);
         } catch (Exception e) {
             return new APIGatewayProxyResponseEvent()
                     .withStatusCode(500)
                     .withBody("{\"error\": \"Unexpected server error: " + e.getMessage() + "\"}");
         }
     }
+
+    private List<CauseCompanyStats> getTopCompaniesByCause(String causeId) {
+        QueryRequest request = QueryRequest.builder()
+                .tableName("cause_company_stats")
+                .keyConditionExpression("cause_id = :cid")
+                .expressionAttributeValues(Map.of(
+                        ":cid", AttributeValue.fromS(causeId)
+                ))
+                .projectionExpression("cause_id, cause_desc, company_id, company_name, boycott_count")
+                .scanIndexForward(false) // descending order
+                .limit(3)
+                .build();
+
+        QueryResponse response = dynamoDb.query(request);
+
+        return response.items().stream()
+                .map(item -> {
+                    CauseCompanyStats stats = new CauseCompanyStats();
+                    stats.setCause_id(causeId);
+                    stats.setCause_desc(item.getOrDefault("cause_desc",AttributeValue.fromS("")).s());
+                    stats.setCompany_id(item.getOrDefault("company_id", AttributeValue.fromS("")).s());
+                    stats.setCompany_name(item.getOrDefault("company_name", AttributeValue.fromS("")).s());
+                    stats.setBoycott_count(Integer.parseInt(item.getOrDefault("boycott_count", AttributeValue.fromN("0")).n()));
+                    return stats;
+                })
+                .collect(Collectors.toList());
+    }
+
 }
