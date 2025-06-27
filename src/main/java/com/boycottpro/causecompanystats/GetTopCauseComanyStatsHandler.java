@@ -6,6 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 
 import com.boycottpro.models.CauseCompanyStats;
+import com.boycottpro.models.ResponseMessage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -34,9 +35,14 @@ public class GetTopCauseComanyStatsHandler implements RequestHandler<APIGatewayP
             Map<String, String> pathParams = event.getPathParameters();
             String causeId = (pathParams != null) ? pathParams.get("cause_id") : null;
             if (causeId == null || causeId.isEmpty()) {
+                ResponseMessage message = new ResponseMessage(400,
+                        "sorry, there was an error processing your request",
+                        "cause_id is missing!");
+                String responseBody = objectMapper.writeValueAsString(message);
                 return new APIGatewayProxyResponseEvent()
                         .withStatusCode(400)
-                        .withBody("{\"error\":\"Missing cause_id in path\"}");
+                        .withHeaders(Map.of("Content-Type", "application/json"))
+                        .withBody(responseBody);
             }
             List<CauseCompanyStats> stats = getTopCompaniesByCause(causeId);
             String responseBody = objectMapper.writeValueAsString(stats);
@@ -45,9 +51,19 @@ public class GetTopCauseComanyStatsHandler implements RequestHandler<APIGatewayP
                     .withHeaders(Map.of("Content-Type", "application/json"))
                     .withBody(responseBody);
         } catch (Exception e) {
+            ResponseMessage message = new ResponseMessage(500,
+                    "sorry, there was an error processing your request",
+                    "Unexpected server error: " + e.getMessage());
+            String responseBody = null;
+            try {
+                responseBody = objectMapper.writeValueAsString(message);
+            } catch (JsonProcessingException ex) {
+                throw new RuntimeException(ex);
+            }
             return new APIGatewayProxyResponseEvent()
                     .withStatusCode(500)
-                    .withBody("{\"error\": \"Unexpected server error: " + e.getMessage() + "\"}");
+                    .withHeaders(Map.of("Content-Type", "application/json"))
+                    .withBody(responseBody);
         }
     }
 

@@ -3,6 +3,8 @@ package com.boycottpro.causecompanystats;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.boycottpro.causecompanystats.GetTopCauseComanyStatsHandler;
 import com.boycottpro.models.CauseCompanyStats;
+import com.boycottpro.models.ResponseMessage;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -79,18 +82,19 @@ public class GetTopCauseComanyStatsHandlerTest {
     }
 
     @Test
-    public void testHandleRequest_missingCauseId() {
+    public void testHandleRequest_missingCauseId() throws JsonProcessingException {
         APIGatewayProxyRequestEvent requestEvent = new APIGatewayProxyRequestEvent()
                 .withPathParameters(Map.of());
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(requestEvent, context);
 
         assertEquals(400, response.getStatusCode());
-        assertEquals("{\"error\":\"Missing cause_id in path\"}", response.getBody());
+        ResponseMessage message = objectMapper.readValue(response.getBody(), ResponseMessage.class);
+        assertTrue(message.getMessage().contains("sorry, there was an error processing your request"));
     }
 
     @Test
-    public void testHandleRequest_exception() {
+    public void testHandleRequest_exception() throws JsonProcessingException {
         String causeId = "cause123";
         APIGatewayProxyRequestEvent requestEvent = new APIGatewayProxyRequestEvent()
                 .withPathParameters(Map.of("cause_id", causeId));
@@ -100,6 +104,7 @@ public class GetTopCauseComanyStatsHandlerTest {
         APIGatewayProxyResponseEvent response = handler.handleRequest(requestEvent, context);
 
         assertEquals(500, response.getStatusCode());
-        assert response.getBody().contains("Unexpected server error");
+        ResponseMessage message = objectMapper.readValue(response.getBody(), ResponseMessage.class);
+        assertTrue(message.getMessage().contains("sorry, there was an error processing your request"));
     }
 }
