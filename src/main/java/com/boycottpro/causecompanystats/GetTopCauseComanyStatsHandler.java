@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 
 import com.boycottpro.models.CauseCompanyStats;
 import com.boycottpro.models.ResponseMessage;
+import com.boycottpro.utilities.JwtUtility;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -32,6 +33,8 @@ public class GetTopCauseComanyStatsHandler implements RequestHandler<APIGatewayP
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
         try {
+            String sub = JwtUtility.getSubFromRestEvent(event);
+            if (sub == null) return response(401, "Unauthorized");
             Map<String, String> pathParams = event.getPathParameters();
             String causeId = (pathParams != null) ? pathParams.get("cause_id") : null;
             if (causeId == null || causeId.isEmpty()) {
@@ -39,17 +42,11 @@ public class GetTopCauseComanyStatsHandler implements RequestHandler<APIGatewayP
                         "sorry, there was an error processing your request",
                         "cause_id is missing!");
                 String responseBody = objectMapper.writeValueAsString(message);
-                return new APIGatewayProxyResponseEvent()
-                        .withStatusCode(400)
-                        .withHeaders(Map.of("Content-Type", "application/json"))
-                        .withBody(responseBody);
+                return response(400,responseBody);
             }
             List<CauseCompanyStats> stats = getTopCompaniesByCause(causeId);
             String responseBody = objectMapper.writeValueAsString(stats);
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(200)
-                    .withHeaders(Map.of("Content-Type", "application/json"))
-                    .withBody(responseBody);
+            return response(200,responseBody);
         } catch (Exception e) {
             ResponseMessage message = new ResponseMessage(500,
                     "sorry, there was an error processing your request",
@@ -60,13 +57,15 @@ public class GetTopCauseComanyStatsHandler implements RequestHandler<APIGatewayP
             } catch (JsonProcessingException ex) {
                 throw new RuntimeException(ex);
             }
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(500)
-                    .withHeaders(Map.of("Content-Type", "application/json"))
-                    .withBody(responseBody);
+            return response(500,responseBody);
         }
     }
-
+    private APIGatewayProxyResponseEvent response(int status, String body) {
+        return new APIGatewayProxyResponseEvent()
+                .withStatusCode(status)
+                .withHeaders(Map.of("Content-Type", "application/json"))
+                .withBody(body);
+    }
     private List<CauseCompanyStats> getTopCompaniesByCause(String causeId) {
         QueryRequest request = QueryRequest.builder()
                 .tableName("cause_company_stats")
