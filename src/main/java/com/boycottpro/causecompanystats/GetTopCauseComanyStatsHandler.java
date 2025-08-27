@@ -32,39 +32,36 @@ public class GetTopCauseComanyStatsHandler implements RequestHandler<APIGatewayP
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
+        String sub = null;
         try {
-            String sub = JwtUtility.getSubFromRestEvent(event);
-            if (sub == null) return response(401, "Unauthorized");
+            sub = JwtUtility.getSubFromRestEvent(event);
+            if (sub == null) return response(401, Map.of("message", "Unauthorized"));
             Map<String, String> pathParams = event.getPathParameters();
             String causeId = (pathParams != null) ? pathParams.get("cause_id") : null;
             if (causeId == null || causeId.isEmpty()) {
                 ResponseMessage message = new ResponseMessage(400,
                         "sorry, there was an error processing your request",
                         "cause_id is missing!");
-                String responseBody = objectMapper.writeValueAsString(message);
-                return response(400,responseBody);
+                return response(400,message);
             }
             List<CauseCompanyStats> stats = getTopCompaniesByCause(causeId);
-            String responseBody = objectMapper.writeValueAsString(stats);
-            return response(200,responseBody);
+            return response(200,stats);
         } catch (Exception e) {
-            ResponseMessage message = new ResponseMessage(500,
-                    "sorry, there was an error processing your request",
-                    "Unexpected server error: " + e.getMessage());
-            String responseBody = null;
-            try {
-                responseBody = objectMapper.writeValueAsString(message);
-            } catch (JsonProcessingException ex) {
-                throw new RuntimeException(ex);
-            }
-            return response(500,responseBody);
+            System.out.println(e.getMessage() + " for user " + sub);
+            return response(500,Map.of("error", "Unexpected server error: " + e.getMessage()) );
         }
     }
-    private APIGatewayProxyResponseEvent response(int status, String body) {
+    private APIGatewayProxyResponseEvent response(int status, Object body) {
+        String responseBody = null;
+        try {
+            responseBody = objectMapper.writeValueAsString(body);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
         return new APIGatewayProxyResponseEvent()
                 .withStatusCode(status)
                 .withHeaders(Map.of("Content-Type", "application/json"))
-                .withBody(body);
+                .withBody(responseBody);
     }
     private List<CauseCompanyStats> getTopCompaniesByCause(String causeId) {
         QueryRequest request = QueryRequest.builder()

@@ -127,7 +127,6 @@ public class GetTopCauseComanyStatsHandlerTest {
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
         assertEquals(500, response.getStatusCode());
-        ResponseMessage message = objectMapper.readValue(response.getBody(), ResponseMessage.class);
-        assertTrue(message.getMessage().contains("sorry, there was an error processing your request"));
+        assertTrue(response.getBody().contains("Unexpected server error"));
     }
 }
