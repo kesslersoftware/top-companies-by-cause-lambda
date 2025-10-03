@@ -8,6 +8,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.boycottpro.models.CauseCompanyStats;
 import com.boycottpro.models.ResponseMessage;
 import com.boycottpro.utilities.JwtUtility;
+import com.boycottpro.utilities.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -33,21 +34,29 @@ public class GetTopCauseComanyStatsHandler implements RequestHandler<APIGatewayP
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
         String sub = null;
+        int lineNum = 37;
         try {
             sub = JwtUtility.getSubFromRestEvent(event);
-            if (sub == null) return response(401, Map.of("message", "Unauthorized"));
+            if (sub == null) {
+            Logger.error(41, sub, "user is Unauthorized");
+            return response(401, Map.of("message", "Unauthorized"));
+            }
+            lineNum = 44;
             Map<String, String> pathParams = event.getPathParameters();
             String causeId = (pathParams != null) ? pathParams.get("cause_id") : null;
             if (causeId == null || causeId.isEmpty()) {
+                Logger.error(41, sub, "user is Unauthorized");
                 ResponseMessage message = new ResponseMessage(400,
                         "sorry, there was an error processing your request",
                         "cause_id is missing!");
                 return response(400,message);
             }
+            lineNum = 54;
             List<CauseCompanyStats> stats = getTopCompaniesByCause(causeId);
+            lineNum = 56;
             return response(200,stats);
         } catch (Exception e) {
-            System.out.println(e.getMessage() + " for user " + sub);
+            Logger.error(lineNum, sub, e.getMessage());
             return response(500,Map.of("error", "Unexpected server error: " + e.getMessage()) );
         }
     }
